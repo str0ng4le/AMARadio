@@ -39,6 +39,8 @@ class StationIconProvider : ContentProvider() {
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
         val stationUuid = uri.lastPathSegment ?: return null
+        // The id becomes a file name below: allow only UUID / custom_<hash> characters
+        if (!stationUuid.matches(Regex("[A-Za-z0-9_-]{1,128}"))) return null
         val name = uri.getQueryParameter("name") ?: "Radio"
         val remoteUrl = uri.getQueryParameter("url")
         
@@ -56,8 +58,9 @@ class StationIconProvider : ContentProvider() {
         // 1b. Check if remoteUrl is a local file path
         if (!remoteUrl.isNullOrBlank() && remoteUrl.startsWith("file:/")) {
             try {
-                val localFile = File(remoteUrl.toUri().path ?: "")
-                if (localFile.exists()) {
+                val localFile = File(remoteUrl.toUri().path ?: "").canonicalFile
+                // Only serve custom-station icons stored in station_icons
+                if (localFile.parentFile == iconDir.canonicalFile && localFile.isFile) {
                     return ParcelFileDescriptor.open(localFile, ParcelFileDescriptor.MODE_READ_ONLY)
                 }
             } catch (_: Exception) {}
